@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenClaw Video Summary"
+  short_description: "Summarize video links with timeline and evidence"
+  default_prompt: "Summarize this YouTube/Bilibili/local video in Chinese, include timeline highlights, key evidence, and artifact paths."

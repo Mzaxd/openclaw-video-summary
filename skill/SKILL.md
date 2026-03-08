@@ -1,68 +1,58 @@
 ---
 name: openclaw-video-summary
-description: "Paste a YouTube or Bilibili link into OpenClaw, download it locally, then return a Chinese summary with timeline excerpts and key visual evidence."
+description: "Summarize YouTube/Bilibili/local videos in OpenClaw with a local-first pipeline and Chinese output. Use when users paste video links, request timeline/evidence summaries, or ask to install/configure this tool. For setup tasks, load references/install-index.md first."
 ---
 
 # OpenClaw Video Summary
 
-## Purpose
+## Quick Routing
 
-This skill is the primary user-facing entrypoint for `openclaw-video-summary`.
+- If the user asks to install, configure, or fix environment issues, read `references/install-index.md` first.
+- If the user asks to summarize a video, run the summarize flow below.
 
-The intended interaction is simple:
+## Summarize Flow
 
-1. User pastes a YouTube or Bilibili link into OpenClaw.
-2. The video is downloaded locally first.
-3. The pipeline runs in `fast` mode by default.
-4. OpenClaw replies with:
-   - full Chinese summary
-   - timeline excerpts
-   - key visual evidence summary
-   - task directory and artifact paths
-
-## Input Handling
-
-Accepted inputs:
-
+1. Accept input:
 - YouTube URL
 - Bilibili URL
 - local video path
 
-Do not send remote video URLs directly to a model. Always materialize a local `video.mp4` in the task directory first.
+2. Always materialize a local `video.mp4` in task directory before any model call.
 
-## Mode Selection
+3. Default mode is `auto`.
+- Use `fusion` when user explicitly asks for stronger visual evidence.
+- Use `quality` only when user explicitly asks for slower quality-first processing.
 
-- Default: `fast`
-- Optional: `fusion`
-- Optional: `quality`
+4. Return concise chat response from saved artifacts:
+- Chinese summary
+- timeline highlights
+- key evidence
+- artifact paths
 
-If the user only pastes a link with no extra instruction, run `fast`.
+## Artifact Contract
 
-Use `fusion` when the user asks for visual evidence or consistency checks.
-
-Use `quality` only when the user explicitly asks for a slower, quality-first pass.
-
-## Artifact Reporting
-
-Every successful run should report the task directory plus the key artifacts that exist, typically:
-
+Report existing files in task directory:
 - `summary_zh.md`
 - `timeline.json`
 - `transcript.json`
-- `run_manifest.json`
+- `summarize_manifest.json`
 
-Enhanced modes may also report:
-
+Optional enhanced artifacts:
 - `evidence.json`
 - `fusion_report.md`
 
-## Response Shape
+## Minimal Run Command
 
-OpenClaw should present the saved output in a concise chat-friendly structure:
+```bash
+python3 -m openclaw_video_summary.interfaces.cli summarize "<input>" --mode auto --output-root ./runs --json-summary
+```
 
-1. Chinese summary
-2. timeline highlights
-3. key evidence
-4. artifact paths
+Use `--api-base` and `--api-key` flags or environment variables when provider credentials are required.
+Recommended env vars:
+- `OCVS_API_BASE` / `OCVS_API_KEY`
+- compatible fallback: `OPENAI_BASE_URL` / `OPENAI_API_KEY`
 
-The response shown in chat should be derived from the same saved artifacts rather than a separate one-off format.
+## Notes
+
+- Do not infer success from chat text only. Check artifact files.
+- If provider is unavailable, fallback summary may appear; surface this clearly.
