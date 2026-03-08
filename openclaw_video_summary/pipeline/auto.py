@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +7,8 @@ from typing import Any
 
 from openclaw_video_summary.pipeline.fast import FastRunResult, run_fast
 from openclaw_video_summary.pipeline.fusion import FusionRunResult, _run_fusion_from_fast_result
+from openclaw_video_summary.pipeline.manifest import update_manifest
+from openclaw_video_summary.common.fileio import read_json
 
 
 VISUAL_PATTERNS = [
@@ -60,14 +61,6 @@ def _run_fusion_from_fast(
         model=model,
         chunk_sec=chunk_sec,
     )
-
-
-def _load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _visual_score(text: str) -> tuple[int, list[str]]:
@@ -161,6 +154,20 @@ def _normalize_from_fusion(
     )
 
 
+def _auto_selection_payload(
+    decision: str,
+    reason: str,
+    signals: list[str],
+) -> dict[str, Any]:
+    return {
+        "auto_selection": {
+            "decision": decision,
+            "reason": reason,
+            "signals": signals,
+        }
+    }
+
+
 def run_auto(
     input_value: str,
     *,
@@ -188,23 +195,21 @@ def run_auto(
         compute_type=compute_type,
     )
 
-    transcript_payload = _load_json(fast_result.transcript_json)
-    timeline_payload = _load_json(fast_result.timeline_json)
+    transcript_payload = read_json(fast_result.transcript_json)
+    timeline_payload = read_json(fast_result.timeline_json)
     target_mode, selection_reason, selection_signals = _choose_mode(
         transcript_payload=transcript_payload,
         timeline_payload=timeline_payload,
     )
 
     if target_mode == "fast":
-        manifest = _load_json(fast_result.run_manifest_json)
-        manifest["mode"] = "auto"
-        manifest["selected_mode"] = "fast"
-        manifest["auto_selection"] = {
-            "decision": "fast",
-            "reason": selection_reason,
-            "signals": selection_signals,
-        }
-        _write_json(fast_result.run_manifest_json, manifest)
+        update_manifest(
+            fast_result.run_manifest_json,
+            mode="auto",
+            selected_mode="fast",
+            fallback=fast_result.fallback,
+            extra=_auto_selection_payload("fast", selection_reason, selection_signals),
+        )
         return _normalize_from_fast(
             fast_result,
             selection_reason=selection_reason,
@@ -218,15 +223,15 @@ def run_auto(
         model=model,
         chunk_sec=chunk_sec,
     )
-    manifest = _load_json(fusion_result.run_manifest_json)
+    fusion_manifest = read_json(fusion_result.run_manifest_json)
+    manifest = update_manifest(
+        fusion_result.run_manifest_json,
+        mode="auto",
+        selected_mode=str(fusion_manifest.get("selected_mode") or "fusion"),
+        fallback=fusion_manifest.get("fallback"),
+        extra=_auto_selection_payload(target_mode, selection_reason, selection_signals),
+    )
     selected_mode = str(manifest.get("selected_mode") or "fusion")
-    manifest["mode"] = "auto"
-    manifest["auto_selection"] = {
-        "decision": target_mode,
-        "reason": selection_reason,
-        "signals": selection_signals,
-    }
-    _write_json(fusion_result.run_manifest_json, manifest)
     return _normalize_from_fusion(
         fusion_result,
         selected_mode=selected_mode,

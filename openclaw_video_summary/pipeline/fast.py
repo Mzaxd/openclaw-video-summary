@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
 import time
@@ -9,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from openclaw_video_summary.asr.transcribe import TranscriptPayload, transcribe_with_backend
+from openclaw_video_summary.common.fileio import write_json, write_text
 from openclaw_video_summary.ingest.download import normalize_input_to_video
 from openclaw_video_summary.pipeline.task_layout import build_task_paths
 from openclaw_video_summary.summary.client import LLMClientError, request_summary
@@ -120,14 +120,6 @@ def _request_summary_text(
     )
 
 
-def _write_json(path: Path, payload: dict[str, object]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _write_text(path: Path, content: str) -> None:
-    path.write_text(content, encoding="utf-8")
-
-
 def run_fast(
     input_value: str,
     *,
@@ -170,13 +162,10 @@ def run_fast(
             "input_video": str(paths.video_path),
             "output_dir": str(paths.task_dir),
         }
-        paths.transcript_json.write_text(
-            json.dumps(transcript.to_dict(), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        write_json(paths.transcript_json, transcript.to_dict())
 
     timeline = build_timeline(transcript.segments, window_sec=window_sec)
-    _write_json(
+    write_json(
         paths.timeline_json,
         {
             "timeline": timeline,
@@ -220,7 +209,7 @@ def run_fast(
             }
             summary_text = _local_fallback_markdown(transcript.text, timeline, str(exc))
 
-    _write_text(paths.summary_md, normalize_summary_markdown(summary_text))
+    write_text(paths.summary_md, normalize_summary_markdown(summary_text))
 
     manifest = {
         "url": input_value,
@@ -239,7 +228,7 @@ def run_fast(
             "total_sec": round(time.perf_counter() - begin, 3),
         },
     }
-    _write_json(paths.run_manifest_json, manifest)
+    write_json(paths.run_manifest_json, manifest)
 
     return FastRunResult(
         task_id=task_id,

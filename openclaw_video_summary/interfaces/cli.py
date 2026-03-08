@@ -3,12 +3,22 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from openclaw_video_summary.pipeline.auto import run_auto
 from openclaw_video_summary.pipeline.fast import run_fast
 from openclaw_video_summary.pipeline.fusion import run_fusion
 from openclaw_video_summary.pipeline.quality import run_quality
+
+ModeRunner = Callable[..., Any]
+
+def _mode_runners() -> dict[str, ModeRunner]:
+    return {
+        "auto": run_auto,
+        "fast": run_fast,
+        "fusion": run_fusion,
+        "quality": run_quality,
+    }
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -53,17 +63,20 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _serialize_result(result: Any, mode: str) -> dict[str, Any]:
+    def _string_attr(name: str) -> str:
+        return str(getattr(result, name, ""))
+
     payload: dict[str, Any] = {
         "mode": mode,
         "task_id": getattr(result, "task_id", None),
-        "task_dir": str(getattr(result, "task_dir", "")),
-        "video_path": str(getattr(result, "video_path", "")),
-        "summary_md": str(getattr(result, "summary_md", "")),
-        "summary_zh_md": str(getattr(result, "summary_md", "")),
-        "timeline_json": str(getattr(result, "timeline_json", "")),
-        "transcript_json": str(getattr(result, "transcript_json", "")),
-        "run_manifest_json": str(getattr(result, "run_manifest_json", "")),
-        "manifest": str(getattr(result, "run_manifest_json", "")),
+        "task_dir": _string_attr("task_dir"),
+        "video_path": _string_attr("video_path"),
+        "summary_md": _string_attr("summary_md"),
+        "summary_zh_md": _string_attr("summary_md"),
+        "timeline_json": _string_attr("timeline_json"),
+        "transcript_json": _string_attr("transcript_json"),
+        "run_manifest_json": _string_attr("run_manifest_json"),
+        "manifest": _string_attr("run_manifest_json"),
         "source_kind": getattr(result, "source_kind", None),
         "summary_source": getattr(result, "summary_source", None),
     }
@@ -77,9 +90,9 @@ def _serialize_result(result: Any, mode: str) -> dict[str, Any]:
     if hasattr(result, "fallback"):
         payload["fallback"] = getattr(result, "fallback")
     if hasattr(result, "evidence_json"):
-        payload["evidence_json"] = str(getattr(result, "evidence_json"))
+        payload["evidence_json"] = _string_attr("evidence_json")
     if hasattr(result, "fusion_report_md"):
-        payload["fusion_report_md"] = str(getattr(result, "fusion_report_md"))
+        payload["fusion_report_md"] = _string_attr("fusion_report_md")
 
     return payload
 
@@ -98,14 +111,7 @@ def _run_summarize(args: argparse.Namespace) -> dict[str, Any]:
         "chunk_sec": args.chunk_sec,
     }
 
-    if args.mode == "auto":
-        result = run_auto(args.input_value, **run_kwargs)
-    elif args.mode == "fast":
-        result = run_fast(args.input_value, **run_kwargs)
-    elif args.mode == "fusion":
-        result = run_fusion(args.input_value, **run_kwargs)
-    else:
-        result = run_quality(args.input_value, **run_kwargs)
+    result = _mode_runners()[args.mode](args.input_value, **run_kwargs)
 
     return _serialize_result(result, args.mode)
 

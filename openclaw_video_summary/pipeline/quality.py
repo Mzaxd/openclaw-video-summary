@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from openclaw_video_summary.common.fileio import read_json
 from openclaw_video_summary.pipeline.fast import FastRunResult, run_fast
 from openclaw_video_summary.pipeline.fusion import FusionRunResult, run_fusion
+from openclaw_video_summary.pipeline.manifest import update_manifest
 
 
 @dataclass(frozen=True)
@@ -37,14 +38,6 @@ def _run_quality_enhancement(result: FusionRunResult) -> dict[str, Any]:
         "Quality enhancement is not wired into run_quality yet. Inject or monkeypatch "
         "_run_quality_enhancement in tests, or implement the real backend in a later task."
     )
-
-
-def _load_manifest(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _normalize_from_fast(
@@ -117,22 +110,23 @@ def run_quality(
         fusion_result = _run_fusion_pipeline(input_value, **pipeline_kwargs)
     except Exception as exc:
         fast_result = _run_fast_pipeline(input_value, **pipeline_kwargs)
-        manifest = _load_manifest(fast_result.run_manifest_json)
         fallback = {
             "from": "quality",
             "to": "fast",
             "reason": str(exc),
         }
-        manifest["mode"] = "quality"
-        manifest["selected_mode"] = "fast"
-        manifest["fallback"] = fallback
-        _write_json(fast_result.run_manifest_json, manifest)
+        update_manifest(
+            fast_result.run_manifest_json,
+            mode="quality",
+            selected_mode="fast",
+            fallback=fallback,
+        )
         return _normalize_from_fast(
             fast_result,
             fallback=fallback,
         )
 
-    manifest = _load_manifest(fusion_result.run_manifest_json)
+    manifest = read_json(fusion_result.run_manifest_json)
     fusion_selected_mode = str(manifest.get("selected_mode") or "fusion")
 
     if fusion_selected_mode == "fast":
@@ -141,10 +135,12 @@ def run_quality(
             "to": "fast",
             "reason": "fusion pipeline downgraded to fast",
         }
-        manifest["mode"] = "quality"
-        manifest["selected_mode"] = "fast"
-        manifest["fallback"] = fallback
-        _write_json(fusion_result.run_manifest_json, manifest)
+        update_manifest(
+            fusion_result.run_manifest_json,
+            mode="quality",
+            selected_mode="fast",
+            fallback=fallback,
+        )
         return _normalize_from_fusion(
             fusion_result,
             selected_mode="fast",
@@ -153,11 +149,13 @@ def run_quality(
 
     try:
         enhancement = _run_quality_enhancement(fusion_result)
-        manifest["mode"] = "quality"
-        manifest["selected_mode"] = "quality"
-        manifest["fallback"] = None
-        manifest["quality"] = enhancement
-        _write_json(fusion_result.run_manifest_json, manifest)
+        update_manifest(
+            fusion_result.run_manifest_json,
+            mode="quality",
+            selected_mode="quality",
+            fallback=None,
+            extra={"quality": enhancement},
+        )
         return _normalize_from_fusion(
             fusion_result,
             selected_mode="quality",
@@ -169,10 +167,12 @@ def run_quality(
             "to": "fusion",
             "reason": str(exc),
         }
-        manifest["mode"] = "quality"
-        manifest["selected_mode"] = "fusion"
-        manifest["fallback"] = fallback
-        _write_json(fusion_result.run_manifest_json, manifest)
+        update_manifest(
+            fusion_result.run_manifest_json,
+            mode="quality",
+            selected_mode="fusion",
+            fallback=fallback,
+        )
         return _normalize_from_fusion(
             fusion_result,
             selected_mode="fusion",

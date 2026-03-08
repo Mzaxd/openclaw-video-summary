@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from openclaw_video_summary.pipeline.fast import FastRunResult, _api_credential, run_fast
+from openclaw_video_summary.pipeline.manifest import update_manifest
+from openclaw_video_summary.common.fileio import read_json, write_json, write_text
 from openclaw_video_summary.summary.client import LLMClientError, request_summary, request_video_analysis
 from openclaw_video_summary.summary.prompts import build_summary_messages, normalize_summary_markdown
 from openclaw_video_summary.vision.analyze import VisualEvidence
@@ -39,22 +40,6 @@ class VideoChunk:
 
 def _run_fast_pipeline(input_value: str, **kwargs: Any) -> FastRunResult:
     return run_fast(input_value, **kwargs)
-
-
-def _load_manifest(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _load_transcript(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _write_text(path: Path, content: str) -> None:
-    path.write_text(content, encoding="utf-8")
 
 
 def _probe_duration(video_path: Path) -> float:
@@ -217,7 +202,7 @@ def _write_evidence(path: Path, evidence: list[VisualEvidence]) -> None:
         payload["chunk"] = (item.metadata or {}).get("chunk_index")
         payload["video_analysis"] = item.observation
         items.append(payload)
-    _write_json(path, {"items": items, "count": len(items)})
+    write_json(path, {"items": items, "count": len(items)})
 
 
 def _write_report(path: Path, evidence: list[VisualEvidence]) -> None:
@@ -238,11 +223,11 @@ def _write_report(path: Path, evidence: list[VisualEvidence]) -> None:
                 item.observation or "（未返回画面分析）",
             ]
         )
-    _write_text(path, "\n".join(lines).strip() + "\n")
+    write_text(path, "\n".join(lines).strip() + "\n")
 
 
 def _load_timeline(path: Path) -> list[dict[str, Any]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = read_json(path)
     return list(payload.get("timeline") or [])
 
 
@@ -294,7 +279,7 @@ def _rewrite_summary_with_evidence(
         messages=messages,
     )
     normalized = normalize_summary_markdown(content)
-    summary_md.write_text(normalized, encoding="utf-8")
+    write_text(summary_md, normalized)
     return normalized
 
 
@@ -308,11 +293,11 @@ def _run_fusion_from_fast_result(
 ) -> FusionRunResult:
     evidence_json = fast_result.task_dir / "evidence.json"
     fusion_report_md = fast_result.task_dir / "fusion_report.md"
-    manifest = _load_manifest(fast_result.run_manifest_json)
+    manifest = read_json(fast_result.run_manifest_json)
     final_api_base, final_api_key = _api_credential(api_base, api_key)
 
     try:
-        transcript_payload = _load_transcript(fast_result.transcript_json)
+        transcript_payload = read_json(fast_result.transcript_json)
         timeline = _load_timeline(fast_result.timeline_json)
         chunks = _split_video_chunks(
             fast_result.video_path,
@@ -354,16 +339,20 @@ def _run_fusion_from_fast_result(
                 "to": "fast_summary",
                 "reason": str(exc),
             }
-        manifest["mode"] = "fusion"
-        manifest["selected_mode"] = "fusion"
-        manifest["summary_source"] = summary_source
-        manifest["chunk_sec"] = chunk_sec
-        manifest["chunk_count"] = len(chunks)
-        manifest["chunks_dir"] = str(fast_result.task_dir / "chunks")
-        manifest["evidence_items"] = len(evidence)
-        manifest["fallback"] = None
-        manifest["summary_fallback"] = summary_fallback
-        _write_json(fast_result.run_manifest_json, manifest)
+        update_manifest(
+            fast_result.run_manifest_json,
+            mode="fusion",
+            selected_mode="fusion",
+            fallback=None,
+            extra={
+                "summary_source": summary_source,
+                "chunk_sec": chunk_sec,
+                "chunk_count": len(chunks),
+                "chunks_dir": str(fast_result.task_dir / "chunks"),
+                "evidence_items": len(evidence),
+                "summary_fallback": summary_fallback,
+            },
+        )
         fallback = None
     except Exception as exc:
         fallback = {
@@ -371,12 +360,16 @@ def _run_fusion_from_fast_result(
             "to": "fast",
             "reason": str(exc),
         }
-        manifest["mode"] = "fusion"
-        manifest["selected_mode"] = "fast"
-        manifest["chunk_sec"] = chunk_sec
-        manifest["fallback"] = fallback
-        manifest["evidence_items"] = 0
-        _write_json(fast_result.run_manifest_json, manifest)
+        update_manifest(
+            fast_result.run_manifest_json,
+            mode="fusion",
+            selected_mode="fast",
+            fallback=fallback,
+            extra={
+                "chunk_sec": chunk_sec,
+                "evidence_items": 0,
+            },
+        )
 
     return FusionRunResult(
         task_id=fast_result.task_id,
