@@ -14,3 +14,6 @@ authors = [
 
 [project.scripts]
 openclaw-video-summary = "openclaw_video_summary.interfaces.cli:main"
+
+[tool.setuptools]
+packages = ["openclaw_video_summary"]
