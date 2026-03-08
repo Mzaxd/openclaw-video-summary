@@ -167,6 +167,15 @@ def run_fast(
             "output_dir": str(paths.task_dir),
         }
         write_json(paths.transcript_json, transcript.to_dict())
+    transcribe_result.setdefault(
+        "runtime_profile",
+        {
+            "profile": "unknown",
+            "device": device,
+            "compute_type": compute_type,
+            "reason": "not reported by backend",
+        },
+    )
 
     timeline = build_timeline(transcript.segments, window_sec=window_sec)
     write_json(

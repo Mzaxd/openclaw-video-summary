@@ -22,13 +22,30 @@ class FastPipelineTest(unittest.TestCase):
             original_request_summary = fast_module._request_summary_text
             try:
                 fast_module._build_task_id = lambda _value: "run-1"
-                fast_module._transcribe_video = lambda *, video_path, transcript_path: TranscriptPayload(
-                    text="hello world",
-                    segments=[
-                        {"start": 0.0, "end": 5.0, "text": "hello"},
-                        {"start": 5.0, "end": 10.0, "text": "world"},
-                    ],
-                )
+                def fake_transcribe(**kwargs):
+                    payload = TranscriptPayload(
+                        text="hello world",
+                        segments=[
+                            {"start": 0.0, "end": 5.0, "text": "hello"},
+                            {"start": 5.0, "end": 10.0, "text": "world"},
+                        ],
+                    )
+                    transcript_path = kwargs["transcript_path"]
+                    transcript_path.write_text(json.dumps(payload.to_dict()), encoding="utf-8")
+                    return (
+                        payload,
+                        {
+                            "transcript_file": str(transcript_path),
+                            "runtime_profile": {
+                                "profile": "apple_silicon",
+                                "device": "mps",
+                                "compute_type": "int8_float16",
+                                "reason": "test profile",
+                            },
+                        },
+                    )
+
+                fast_module._transcribe_video = fake_transcribe
                 fast_module._request_summary_text = lambda **_kwargs: "# 总结\n\n- hello world\n"
 
                 result = run_fast(str(sample), output_root=root)
@@ -49,6 +66,9 @@ class FastPipelineTest(unittest.TestCase):
             self.assertEqual(manifest["task_id"], "run-1")
             self.assertEqual(manifest["source_kind"], "local_file")
             self.assertEqual(manifest["mode"], "fast")
+            self.assertEqual(manifest["transcribe"]["runtime_profile"]["profile"], "apple_silicon")
+            self.assertEqual(manifest["transcribe"]["runtime_profile"]["device"], "mps")
+            self.assertEqual(manifest["transcribe"]["runtime_profile"]["compute_type"], "int8_float16")
 
             timeline = json.loads(result.timeline_json.read_text(encoding="utf-8"))
             self.assertEqual(timeline["timeline"][0]["summary"], "hello world")
