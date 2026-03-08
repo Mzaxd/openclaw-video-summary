@@ -70,6 +70,7 @@ def _transcribe_video(
     asr_model: str = "small",
     device: str = "auto",
     compute_type: str = "int8",
+    platform_profile: str = "auto",
 ) -> tuple[TranscriptPayload, dict[str, Any]]:
     return transcribe_with_backend(
         input_path=video_path,
@@ -78,6 +79,7 @@ def _transcribe_video(
         language=language,
         device=device,
         compute_type=compute_type,
+        platform_profile=platform_profile,
     )
 
 
@@ -132,6 +134,7 @@ def run_fast(
     asr_model: str = "small",
     device: str = "auto",
     compute_type: str = "int8",
+    platform_profile: str = "auto",
     **_: Any,
 ) -> FastRunResult:
     begin = time.perf_counter()
@@ -147,6 +150,7 @@ def run_fast(
             asr_model=asr_model,
             device=device,
             compute_type=compute_type,
+            platform_profile=platform_profile,
         )
     except TypeError:
         transcribe_output = _transcribe_video(
@@ -163,6 +167,15 @@ def run_fast(
             "output_dir": str(paths.task_dir),
         }
         write_json(paths.transcript_json, transcript.to_dict())
+    transcribe_result.setdefault(
+        "runtime_profile",
+        {
+            "profile": "unknown",
+            "device": device,
+            "compute_type": compute_type,
+            "reason": "not reported by backend",
+        },
+    )
 
     timeline = build_timeline(transcript.segments, window_sec=window_sec)
     write_json(

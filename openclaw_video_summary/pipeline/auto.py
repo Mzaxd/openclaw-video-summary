@@ -180,6 +180,7 @@ def run_auto(
     asr_model: str = "small",
     device: str = "auto",
     compute_type: str = "int8",
+    platform_profile: str = "auto",
     chunk_sec: float = 180.0,
 ) -> AutoRunResult:
     fast_result = _run_fast_pipeline(
@@ -193,6 +194,7 @@ def run_auto(
         asr_model=asr_model,
         device=device,
         compute_type=compute_type,
+        platform_profile=platform_profile,
     )
 
     transcript_payload = read_json(fast_result.transcript_json)

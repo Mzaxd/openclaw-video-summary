@@ -398,6 +398,7 @@ def run_fusion(
     asr_model: str = "small",
     device: str = "auto",
     compute_type: str = "int8",
+    platform_profile: str = "auto",
     chunk_sec: float = 180.0,
     **_: Any,
 ) -> FusionRunResult:
@@ -412,6 +413,7 @@ def run_fusion(
         asr_model=asr_model,
         device=device,
         compute_type=compute_type,
+        platform_profile=platform_profile,
     )
     return _run_fusion_from_fast_result(
         fast_result,

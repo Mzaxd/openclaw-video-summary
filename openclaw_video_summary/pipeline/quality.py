@@ -91,6 +91,7 @@ def run_quality(
     asr_model: str = "small",
     device: str = "auto",
     compute_type: str = "int8",
+    platform_profile: str = "auto",
     chunk_sec: float = 180.0,
 ) -> QualityRunResult:
     pipeline_kwargs = {
@@ -103,6 +104,7 @@ def run_quality(
         "asr_model": asr_model,
         "device": device,
         "compute_type": compute_type,
+        "platform_profile": platform_profile,
         "chunk_sec": chunk_sec,
     }
 

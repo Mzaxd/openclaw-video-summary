@@ -93,6 +93,72 @@ class CliIntegrationTest(unittest.TestCase):
         self.assertEqual(payload["selected_mode"], "quality")
         self.assertEqual(payload["source_kind"], "local_file")
 
+    def test_cli_passes_platform_profile_to_mode_runner(self) -> None:
+        import openclaw_video_summary.interfaces.cli as cli_module
+
+        captured: dict[str, object] = {}
+
+        original_auto = cli_module.run_auto
+        original_fast = cli_module.run_fast
+        original_fusion = cli_module.run_fusion
+        original_quality = cli_module.run_quality
+        try:
+            def fail_other(*args, **kwargs):
+                raise AssertionError("only fast should be called")
+
+            def fake_fast(input_value: str, **kwargs):
+                captured.update(kwargs)
+                with tempfile.TemporaryDirectory() as td:
+                    task_dir = Path(td) / "run-fast"
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                    summary_md = task_dir / "summary_zh.md"
+                    timeline_json = task_dir / "timeline.json"
+                    transcript_json = task_dir / "transcript.json"
+                    run_manifest_json = task_dir / "run_manifest.json"
+                    video_path = task_dir / "video.mp4"
+                    for path in (summary_md, timeline_json, transcript_json, run_manifest_json, video_path):
+                        path.write_text("{}", encoding="utf-8")
+
+                    from openclaw_video_summary.pipeline.fast import FastRunResult
+
+                    return FastRunResult(
+                        task_id="run-fast",
+                        task_dir=task_dir,
+                        video_path=video_path,
+                        summary_md=summary_md,
+                        timeline_json=timeline_json,
+                        transcript_json=transcript_json,
+                        run_manifest_json=run_manifest_json,
+                        source_kind="local_file",
+                    )
+
+            cli_module.run_auto = fail_other
+            cli_module.run_fast = fake_fast
+            cli_module.run_fusion = fail_other
+            cli_module.run_quality = fail_other
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = cli_module.main(
+                    [
+                        "summarize",
+                        "/tmp/sample.mp4",
+                        "--mode",
+                        "fast",
+                        "--platform-profile",
+                        "apple_silicon",
+                        "--json-summary",
+                    ]
+                )
+        finally:
+            cli_module.run_auto = original_auto
+            cli_module.run_fast = original_fast
+            cli_module.run_fusion = original_fusion
+            cli_module.run_quality = original_quality
+
+        self.assertEqual(code, 0)
+        self.assertEqual(captured.get("platform_profile"), "apple_silicon")
+
     def test_cli_defaults_to_auto_mode(self) -> None:
         import openclaw_video_summary.interfaces.cli as cli_module
 
