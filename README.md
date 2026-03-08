@@ -37,11 +37,18 @@ export OCVS_API_KEY="your-api-key"
 python3 -m openclaw_video_summary.interfaces.cli summarize \
   "https://www.bilibili.com/video/BV..." \
   --mode auto \
+  --platform-profile auto \
   --output-root ./runs \
   --api-base "$OCVS_API_BASE" \
   --api-key "$OCVS_API_KEY" \
   --json-summary
 ```
+
+## 平台加速（ASR）
+
+- 默认 `--platform-profile auto`：根据平台自动推断较优 `device/compute_type`
+- 可手动指定：`--platform-profile apple_silicon|nvidia|intel|amd|cpu`
+- 显式传 `--device` 或 `--compute-type` 时，会覆盖 profile 自动选择
 
 ## 为什么好用
 

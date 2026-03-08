@@ -89,11 +89,48 @@ python3 -m openclaw_video_summary.interfaces.cli summarize \
 - `--model <name>`
 - `--asr-model <tiny|base|small|...>`
 - `--language <auto|zh|en|...>`
+- `--platform-profile <auto|nvidia|apple_silicon|intel|amd|cpu>`
 - `--device <auto|cpu|cuda>`
 - `--compute-type <int8|float16|...>`
 - `--window-sec <seconds>`
 - `--chunk-sec <seconds>`
 - `--json-summary`
+
+### 平台加速示例 | Platform Acceleration Examples
+
+Apple Silicon:
+
+```bash
+python3 -m openclaw_video_summary.interfaces.cli summarize \
+  "./sample.mp4" \
+  --mode fast \
+  --platform-profile apple_silicon \
+  --output-root ./runs
+```
+
+NVIDIA:
+
+```bash
+python3 -m openclaw_video_summary.interfaces.cli summarize \
+  "./sample.mp4" \
+  --mode fast \
+  --platform-profile nvidia \
+  --output-root ./runs
+```
+
+CPU fallback:
+
+```bash
+python3 -m openclaw_video_summary.interfaces.cli summarize \
+  "./sample.mp4" \
+  --mode fast \
+  --platform-profile cpu \
+  --output-root ./runs
+```
+
+覆盖规则 | Override precedence:
+- 如果显式传了 `--device` 或 `--compute-type`，优先使用显式参数
+- 否则按 `--platform-profile` 进行自动/手动平台选择
 
 ## 5. `auto` 如何判断 | How `auto` Decides
 
