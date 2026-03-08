@@ -1,0 +1,25 @@
+{
+  "default": "default",
+  "rules": [
+    {
+      "type": "tutorial",
+      "min_hits": 2,
+      "keywords": ["教程", "实操", "步骤", "安装", "配置", "点击", "演示", "setup", "how to", "guide"]
+    },
+    {
+      "type": "interview",
+      "min_hits": 2,
+      "keywords": ["访谈", "采访", "对谈", "主持人", "嘉宾", "问答", "roundtable", "interview", "podcast"]
+    },
+    {
+      "type": "review",
+      "min_hits": 2,
+      "keywords": ["评测", "测评", "对比", "参数", "续航", "体验", "优点", "缺点", "review", "benchmark"]
+    },
+    {
+      "type": "news",
+      "min_hits": 2,
+      "keywords": ["新闻", "快讯", "发布会", "政策", "通报", "公告", "breaking", "update", "announcement"]
+    }
+  ]
+}

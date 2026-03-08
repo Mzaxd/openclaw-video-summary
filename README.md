@@ -2,12 +2,12 @@
 
 默认文档语言：中文。English version: [README.en.md](README.en.md)
 
-把视频链接贴给 OpenClaw，自动下载、转写、总结，返回中文结果和可追溯产物。
+把视频链接贴给 OpenClaw，脚本自动完成下载/字幕提取/转写/分段，最后由 OpenClaw 会话内模型基于模板完成中文总结。
 
 ## 给 OpenClaw 的最快安装方式（推荐）
 
 直接使用安装手册：
-- [docs/openclaw-install-for-ai.md](docs/openclaw-install-for-ai.md)
+- [skill/references/openclaw-install-for-ai.md](skill/references/openclaw-install-for-ai.md)
 
 这份手册已经包含：
 - macOS / Linux / Windows(WSL2) 自动分流安装
@@ -17,30 +17,20 @@
 
 ## 3 步上手
 
-### 1) 安装依赖与项目
+### 1) 安装依赖
 
 ```bash
-python3 -m pip install -e .
-python3 -m pip install -e 'tools/bili-analyzer[asr]'
+python3 -m pip install "faster-whisper>=1.0.0"
 ```
 
-### 2) 配置模型接口
+### 2) 运行
 
 ```bash
-export OCVS_API_BASE="https://your-openai-compatible-endpoint"
-export OCVS_API_KEY="your-api-key"
-```
-
-### 3) 运行
-
-```bash
-python3 -m openclaw_video_summary.interfaces.cli summarize \
+python3 skill/scripts/video_summary.py summarize \
   "https://www.bilibili.com/video/BV..." \
   --mode auto \
   --platform-profile auto \
   --output-root ./runs \
-  --api-base "$OCVS_API_BASE" \
-  --api-key "$OCVS_API_KEY" \
   --json-summary
 ```
 
@@ -55,23 +45,22 @@ python3 -m openclaw_video_summary.interfaces.cli summarize \
 
 - 简单：贴链接即可，默认 `auto` 自动选最合适模式
 - 稳定：先落盘再总结，产物完整可复查
-- 省心：失败自动降级，仍能给出可用结果
+- 清晰：脚本不依赖外部 LLM，总结由 OpenClaw 在会话内完成
 
 ## 模板自定义（重点）
 
-不改 Python 代码，也能长期定制总结风格。
+不改脚本逻辑，也能长期定制总结风格。
 
-覆盖优先级：
-1. `OCVS_SUMMARY_TEMPLATE_FILE=/absolute/path/to/summary_prompt.md`
-2. 仓库本地 `summary_prompt.local.md`
-3. 全局 `~/.config/openclaw-video-summary/summary_prompt.md`
-4. 内置默认模板
+模板文件：
+- `skill/templates/default.md`
+- `skill/templates/tutorial.md`
+- `skill/templates/interview.md`
+- `skill/templates/review.md`
+- `skill/templates/news.md`
 
-快速开始：
-
-```bash
-cp summary_prompt.local.md.example summary_prompt.local.md
-```
+规则文件：
+- `skill/config/template_rules.json`
+- 自动按关键词路由模板，也可用 `--template-type` 手动指定。
 
 模板占位符：
 - `{{visual_context}}`
@@ -79,13 +68,13 @@ cp summary_prompt.local.md.example summary_prompt.local.md
 - `{{transcript_text}}`
 
 参考：
-- [summary_prompt.local.md.example](summary_prompt.local.md.example)
-- [summary_prompt.default.md](openclaw_video_summary/summary/summary_prompt.default.md)
+- 模板占位符：`{{visual_context}}` `{{timeline_brief}}` `{{transcript_text}}`
 
 ## 输出结果
 
 每次运行会生成任务目录，核心文件：
 - `summary_zh.md`
+- `summary_task_prompt.md`
 - `timeline.json`
 - `transcript.json`
 - `summarize_manifest.json`
@@ -93,11 +82,11 @@ cp summary_prompt.local.md.example summary_prompt.local.md
 ## 技术细节（简版）
 
 - 输入：YouTube / Bilibili / 本地视频
-- 模式：`auto`（默认）、`fast`、`fusion`、`quality`
+- 模式：`auto`（默认）、`fast`、`fusion`
 - 依赖：`python>=3.10`、`yt-dlp`、`ffmpeg`
-- 接口：OpenAI-compatible
+- 执行入口：`skill/scripts/video_summary.py`
 
 详细说明见：
-- 使用手册：[docs/usage.md](docs/usage.md)
+- 使用手册：[skill/references/usage.md](skill/references/usage.md)
 - Skill 合约：[skill/SKILL.md](skill/SKILL.md)
-- 安装手册（给 OpenClaw）：[docs/openclaw-install-for-ai.md](docs/openclaw-install-for-ai.md)
+- 安装手册（给 OpenClaw）：[skill/references/openclaw-install-for-ai.md](skill/references/openclaw-install-for-ai.md)
