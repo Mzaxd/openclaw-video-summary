@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
+import re
+from pathlib import Path
 from typing import Any
+
+
+SYSTEM_PROMPT = (
+    "你是严谨的视频内容分析助手。"
+    "你擅长把长视频整理成信息密度高、结构清楚、观点明确的中文总结。"
+    "你不会泛泛而谈，也不会只做表面改写。"
+)
 
 
 def _safe_text(text: str, limit: int) -> str:
@@ -9,6 +19,61 @@ def _safe_text(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + "\n...[truncated]..."
+
+
+def normalize_summary_markdown(text: str) -> str:
+    body = (text or "").strip()
+    fenced = re.match(r"^```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```$", body)
+    if fenced:
+        body = fenced.group(1).strip()
+    return body.strip() + ("\n" if body.strip() else "")
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _default_template_path() -> Path:
+    return Path(__file__).with_name("summary_prompt.default.md")
+
+
+def resolve_summary_template_path() -> Path:
+    explicit = (os.environ.get("OCVS_SUMMARY_TEMPLATE_FILE") or "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+
+    repo_local = _repo_root() / "summary_prompt.local.md"
+    if repo_local.exists():
+        return repo_local
+
+    user_global = Path.home() / ".config" / "openclaw-video-summary" / "summary_prompt.md"
+    if user_global.exists():
+        return user_global
+
+    return _default_template_path()
+
+
+def _load_summary_template() -> str:
+    path = resolve_summary_template_path()
+    return path.read_text(encoding="utf-8")
+
+
+def _render_summary_template(
+    *,
+    transcript_text: str,
+    timeline_brief: list[dict[str, Any]],
+    visual_json: str,
+) -> str:
+    template = _load_summary_template()
+    replacements = {
+        "{{visual_context}}": visual_json,
+        "{{timeline_brief}}": json.dumps(timeline_brief, ensure_ascii=False, indent=2),
+        "{{transcript_text}}": _safe_text(transcript_text, 18000),
+    }
+    rendered = template
+    for needle, value in replacements.items():
+        rendered = rendered.replace(needle, value)
+    return rendered.strip()
 
 
 def build_summary_messages(
@@ -28,27 +93,17 @@ def build_summary_messages(
 
     visual_json = "无"
     if visual_context:
-        visual_json = json.dumps(visual_context, ensure_ascii=False)
+        visual_json = json.dumps(visual_context, ensure_ascii=False, indent=2)
 
-    user_content = (
-        "请基于以下视频转写内容生成中文总结。\n"
-        "要求：\n"
-        "1) 无论原视频是中文或英文，最终输出必须为中文。\n"
-        "2) 使用 Markdown。\n"
-        "3) 包含以下部分：\n"
-        "   - 一句话总结\n"
-        "   - 核心要点（3-8条）\n"
-        "   - 时间线解读（按阶段）\n"
-        "   - 可执行建议（如适用）\n"
-        "4) 不要杜撰未出现的信息。\n\n"
-        f"视觉上下文（可选）：\n{visual_json}\n\n"
-        f"时间线摘要（前20段）：\n{json.dumps(timeline_brief, ensure_ascii=False, indent=2)}\n\n"
-        f"转写全文（可能截断）：\n{_safe_text(transcript_text, 12000)}\n"
+    user_content = _render_summary_template(
+        transcript_text=transcript_text,
+        timeline_brief=timeline_brief,
+        visual_json=visual_json,
     )
     return [
         {
             "role": "system",
-            "content": "你是严谨的视频内容分析助手，擅长将中英文视频内容统一整理为高质量中文总结。",
+            "content": SYSTEM_PROMPT,
         },
         {
             "role": "user",

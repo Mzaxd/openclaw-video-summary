@@ -12,7 +12,7 @@ from openclaw_video_summary.asr.transcribe import TranscriptPayload, transcribe_
 from openclaw_video_summary.ingest.download import normalize_input_to_video
 from openclaw_video_summary.pipeline.task_layout import build_task_paths
 from openclaw_video_summary.summary.client import LLMClientError, request_summary
-from openclaw_video_summary.summary.prompts import build_summary_messages
+from openclaw_video_summary.summary.prompts import build_summary_messages, normalize_summary_markdown
 from openclaw_video_summary.timeline.build import build_timeline
 
 
@@ -220,7 +220,7 @@ def run_fast(
             }
             summary_text = _local_fallback_markdown(transcript.text, timeline, str(exc))
 
-    _write_text(paths.summary_md, summary_text.strip() + "\n")
+    _write_text(paths.summary_md, normalize_summary_markdown(summary_text))
 
     manifest = {
         "url": input_value,

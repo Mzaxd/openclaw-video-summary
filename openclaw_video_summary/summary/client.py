@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from urllib import error, request
 from typing import Any
@@ -20,24 +21,16 @@ def _normalize_base(api_base: str) -> str:
     return f"{base}/v1/chat/completions"
 
 
-def request_summary(
+def _request_text(
     *,
     api_base: str,
     api_key: str,
-    model: str,
-    messages: list[dict[str, str]],
+    payload: dict[str, Any],
     timeout_sec: float = 60.0,
 ) -> str:
-    payload = json.dumps(
-        {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.2,
-        }
-    ).encode("utf-8")
     req = request.Request(
         _normalize_base(api_base),
-        data=payload,
+        data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -77,3 +70,79 @@ def request_summary(
         raise LLMClientError(f"Invalid LLM response payload: {exc}") from exc
 
     raise LLMClientError("LLM response does not contain text content")
+
+
+def request_summary(
+    *,
+    api_base: str,
+    api_key: str,
+    model: str,
+    messages: list[dict[str, Any]],
+    timeout_sec: float = 60.0,
+) -> str:
+    return _request_text(
+        api_base=api_base,
+        api_key=api_key,
+        payload={
+            "model": model,
+            "messages": messages,
+            "temperature": 0.2,
+        },
+        timeout_sec=timeout_sec,
+    )
+
+
+def request_video_analysis(
+    *,
+    api_base: str,
+    api_key: str,
+    model: str,
+    video_path: str,
+    prompt: str,
+    timeout_sec: float = 180.0,
+) -> str:
+    with open(video_path, "rb") as handle:
+        video_bytes = base64.b64encode(handle.read()).decode("ascii")
+    data_uri = f"data:video/mp4;base64,{video_bytes}"
+    attempts = [
+        {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "input_video", "input_video": {"data": data_uri}},
+                    ],
+                }
+            ],
+            "temperature": 0.1,
+        },
+        {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "video_url", "video_url": {"url": data_uri}},
+                    ],
+                }
+            ],
+            "temperature": 0.1,
+        },
+    ]
+
+    last_error: Exception | None = None
+    for payload in attempts:
+        try:
+            return _request_text(
+                api_base=api_base,
+                api_key=api_key,
+                payload=payload,
+                timeout_sec=timeout_sec,
+            )
+        except LLMClientError as exc:
+            last_error = exc
+
+    raise LLMClientError(str(last_error) if last_error else "video analysis request failed")

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from openclaw_video_summary.pipeline.auto import run_auto
 from openclaw_video_summary.pipeline.fast import run_fast
 from openclaw_video_summary.pipeline.fusion import run_fusion
 from openclaw_video_summary.pipeline.quality import run_quality
@@ -22,8 +23,8 @@ def _build_parser() -> argparse.ArgumentParser:
     summarize.add_argument("-o", "--output-root", "--output", dest="output_root", default="./tmp", help="Directory for run artifacts")
     summarize.add_argument(
         "--mode",
-        choices=["fast", "fusion", "quality"],
-        default="fast",
+        choices=["auto", "fast", "fusion", "quality"],
+        default="auto",
         help="Pipeline mode",
     )
     summarize.add_argument("--language", default="auto", help="ASR language code or auto (default: auto)")
@@ -33,8 +34,7 @@ def _build_parser() -> argparse.ArgumentParser:
     summarize.add_argument("--api-base", default="", help="OpenAI-compatible API base URL")
     summarize.add_argument("--api-key", default="", help="OpenAI-compatible API key")
     summarize.add_argument("--model", "--llm-model", dest="model", default="glm-4.6v", help="Model name")
-    summarize.add_argument("--fps", type=float, default=0.5, help="Frame fps for fusion mode")
-    summarize.add_argument("--similarity", type=float, default=0.85, help="Frame dedup similarity for fusion mode")
+    summarize.add_argument("--chunk-sec", type=float, default=180.0, help="Chunk size in seconds for fusion mode")
     summarize.add_argument(
         "--window-sec",
         "--timeline-window-sec",
@@ -70,6 +70,10 @@ def _serialize_result(result: Any, mode: str) -> dict[str, Any]:
 
     if hasattr(result, "selected_mode"):
         payload["selected_mode"] = getattr(result, "selected_mode")
+    if hasattr(result, "selection_reason"):
+        payload["selection_reason"] = getattr(result, "selection_reason")
+    if hasattr(result, "selection_signals"):
+        payload["selection_signals"] = getattr(result, "selection_signals")
     if hasattr(result, "fallback"):
         payload["fallback"] = getattr(result, "fallback")
     if hasattr(result, "evidence_json"):
@@ -91,11 +95,12 @@ def _run_summarize(args: argparse.Namespace) -> dict[str, Any]:
         "asr_model": args.asr_model,
         "device": args.device,
         "compute_type": args.compute_type,
-        "fps": args.fps,
-        "similarity": args.similarity,
+        "chunk_sec": args.chunk_sec,
     }
 
-    if args.mode == "fast":
+    if args.mode == "auto":
+        result = run_auto(args.input_value, **run_kwargs)
+    elif args.mode == "fast":
         result = run_fast(args.input_value, **run_kwargs)
     elif args.mode == "fusion":
         result = run_fusion(args.input_value, **run_kwargs)

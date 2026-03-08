@@ -94,6 +94,11 @@ def run_quality(
     api_key: str = "",
     model: str = "glm-4.6v",
     window_sec: float = 90.0,
+    language: str = "auto",
+    asr_model: str = "small",
+    device: str = "auto",
+    compute_type: str = "int8",
+    chunk_sec: float = 180.0,
 ) -> QualityRunResult:
     pipeline_kwargs = {
         "output_root": output_root,
@@ -101,6 +106,11 @@ def run_quality(
         "api_key": api_key,
         "model": model,
         "window_sec": window_sec,
+        "language": language,
+        "asr_model": asr_model,
+        "device": device,
+        "compute_type": compute_type,
+        "chunk_sec": chunk_sec,
     }
 
     try:
