@@ -19,20 +19,28 @@ def _build_parser() -> argparse.ArgumentParser:
 
     summarize = subparsers.add_parser("summarize", help="Summarize a video input")
     summarize.add_argument("input_value", help="Video URL or local file path")
-    summarize.add_argument("-o", "--output-root", default="./runs", help="Directory for run artifacts")
+    summarize.add_argument("-o", "--output-root", "--output", dest="output_root", default="./tmp", help="Directory for run artifacts")
     summarize.add_argument(
         "--mode",
         choices=["fast", "fusion", "quality"],
         default="fast",
         help="Pipeline mode",
     )
+    summarize.add_argument("--language", default="auto", help="ASR language code or auto (default: auto)")
+    summarize.add_argument("--asr-model", default="small", help="ASR model size (default: small)")
+    summarize.add_argument("--device", default="auto", help="ASR device (default: auto)")
+    summarize.add_argument("--compute-type", default="int8", help="ASR compute type (default: int8)")
     summarize.add_argument("--api-base", default="", help="OpenAI-compatible API base URL")
     summarize.add_argument("--api-key", default="", help="OpenAI-compatible API key")
-    summarize.add_argument("--model", default="glm-4.6v", help="Model name")
+    summarize.add_argument("--model", "--llm-model", dest="model", default="glm-4.6v", help="Model name")
+    summarize.add_argument("--fps", type=float, default=0.5, help="Frame fps for fusion mode")
+    summarize.add_argument("--similarity", type=float, default=0.85, help="Frame dedup similarity for fusion mode")
     summarize.add_argument(
         "--window-sec",
+        "--timeline-window-sec",
         type=float,
         default=90.0,
+        dest="window_sec",
         help="Timeline window size in seconds",
     )
     summarize.add_argument(
@@ -51,10 +59,13 @@ def _serialize_result(result: Any, mode: str) -> dict[str, Any]:
         "task_dir": str(getattr(result, "task_dir", "")),
         "video_path": str(getattr(result, "video_path", "")),
         "summary_md": str(getattr(result, "summary_md", "")),
+        "summary_zh_md": str(getattr(result, "summary_md", "")),
         "timeline_json": str(getattr(result, "timeline_json", "")),
         "transcript_json": str(getattr(result, "transcript_json", "")),
         "run_manifest_json": str(getattr(result, "run_manifest_json", "")),
+        "manifest": str(getattr(result, "run_manifest_json", "")),
         "source_kind": getattr(result, "source_kind", None),
+        "summary_source": getattr(result, "summary_source", None),
     }
 
     if hasattr(result, "selected_mode"):
@@ -76,6 +87,12 @@ def _run_summarize(args: argparse.Namespace) -> dict[str, Any]:
         "api_key": args.api_key,
         "model": args.model,
         "window_sec": args.window_sec,
+        "language": args.language,
+        "asr_model": args.asr_model,
+        "device": args.device,
+        "compute_type": args.compute_type,
+        "fps": args.fps,
+        "similarity": args.similarity,
     }
 
     if args.mode == "fast":

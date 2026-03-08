@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from openclaw_video_summary.pipeline.fast import FastRunResult, run_fast
-from openclaw_video_summary.vision.analyze import VisualEvidence, VisionAnalyzer
+from openclaw_video_summary.vision.analyze import VisualEvidence
 
 
 @dataclass(frozen=True)
@@ -25,23 +25,26 @@ class FusionRunResult:
     mode: str = "fusion"
 
 
-class _UnconfiguredVisionAnalyzer(VisionAnalyzer):
-    def analyze_video(self, video_path: str | Path) -> list[VisualEvidence]:
-        raise RuntimeError(
-            "Vision backend is not wired into run_fusion yet. Inject or monkeypatch _analyze_video in tests, "
-            "or implement the real backend in a later task."
-        )
-
-
-_VISION_ANALYZER = _UnconfiguredVisionAnalyzer()
-
-
 def _run_fast_pipeline(input_value: str, **kwargs: Any) -> FastRunResult:
     return run_fast(input_value, **kwargs)
 
 
 def _analyze_video(video_path: Path) -> list[VisualEvidence]:
-    return _VISION_ANALYZER.analyze_video(video_path)
+    from openclaw_video_summary.ingest.download import analyze_frames_with_backend
+
+    frame_stats = analyze_frames_with_backend(video_path.parent / "images")
+    preview = (frame_stats.get("preview") or [])[:8]
+    evidence: list[VisualEvidence] = []
+    for index, frame_name in enumerate(preview):
+        evidence.append(
+            VisualEvidence(
+                start=float(index),
+                end=float(index),
+                observation=f"frame evidence: {frame_name}",
+                confidence="medium",
+            )
+        )
+    return evidence
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -83,6 +86,12 @@ def run_fusion(
     api_key: str = "",
     model: str = "glm-4.6v",
     window_sec: float = 90.0,
+    language: str = "auto",
+    asr_model: str = "small",
+    device: str = "auto",
+    compute_type: str = "int8",
+    fps: float = 0.5,
+    similarity: float = 0.85,
 ) -> FusionRunResult:
     fast_result = _run_fast_pipeline(
         input_value,
@@ -91,6 +100,10 @@ def run_fusion(
         api_key=api_key,
         model=model,
         window_sec=window_sec,
+        language=language,
+        asr_model=asr_model,
+        device=device,
+        compute_type=compute_type,
     )
 
     evidence_json = fast_result.task_dir / "evidence.json"
@@ -98,7 +111,24 @@ def run_fusion(
     manifest = _load_manifest(fast_result.run_manifest_json)
 
     try:
+        if not (fast_result.task_dir / "images").exists() and fast_result.source_kind != "local_file":
+            from openclaw_video_summary.pipeline.fast import _ensure_bili_analyzer_import
+
+            _ensure_bili_analyzer_import()
+            from bili_analyzer.core import prepare_video
+
+            prepare_video(
+                url=input_value,
+                output=str(output_root),
+                fps=fps,
+                similarity=similarity,
+                no_dedup=False,
+                video_only=False,
+                frames_only=False,
+            )
         evidence = _analyze_video(fast_result.video_path)
+        if not evidence:
+            raise RuntimeError("fusion mode requires extracted frames")
         _write_evidence(evidence_json, evidence)
         _write_report(fusion_report_md, evidence)
         manifest["mode"] = "fusion"

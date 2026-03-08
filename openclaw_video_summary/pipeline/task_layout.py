@@ -24,5 +24,5 @@ def build_task_paths(output_root: Path | str, task_id: str) -> TaskPaths:
         summary_md=task_dir / "summary_zh.md",
         timeline_json=task_dir / "timeline.json",
         transcript_json=task_dir / "transcript.json",
-        run_manifest_json=task_dir / "run_manifest.json",
+        run_manifest_json=task_dir / "summarize_manifest.json",
     )

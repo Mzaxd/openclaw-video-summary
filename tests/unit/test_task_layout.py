@@ -15,7 +15,7 @@ class TaskLayoutTest(unittest.TestCase):
             self.assertEqual(paths.summary_md.name, "summary_zh.md")
             self.assertEqual(paths.timeline_json.name, "timeline.json")
             self.assertEqual(paths.transcript_json.name, "transcript.json")
-            self.assertEqual(paths.run_manifest_json.name, "run_manifest.json")
+            self.assertEqual(paths.run_manifest_json.name, "summarize_manifest.json")
             self.assertEqual(paths.video_path.name, "video.mp4")
             self.assertTrue(paths.task_dir.exists())
 

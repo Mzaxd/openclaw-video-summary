@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,21 @@ class NormalizedVideo:
     input_value: str
     source_kind: str
     video_path: Path
+
+
+def _ensure_bili_analyzer_import() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    candidates = [
+        repo_root.parent / "tools" / "bili-analyzer",
+        repo_root / "tools" / "bili-analyzer",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            candidate_str = str(candidate)
+            if candidate_str not in sys.path:
+                sys.path.insert(0, candidate_str)
+            return
+    raise RuntimeError("Unable to locate tools/bili-analyzer for frame analysis backend")
 
 
 def _download_video(url: str, video_path: Path) -> None:
@@ -51,3 +67,10 @@ def normalize_input_to_video(input_value: str, output_dir: Path | str) -> Normal
         source_kind=source_kind,
         video_path=video_path,
     )
+
+
+def analyze_frames_with_backend(images_dir: Path | str) -> dict:
+    _ensure_bili_analyzer_import()
+    from bili_analyzer.core import analyze_frames_dir
+
+    return analyze_frames_dir(Path(images_dir))
