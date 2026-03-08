@@ -41,6 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     summarize.add_argument("--asr-model", default="small", help="ASR model size (default: small)")
     summarize.add_argument("--device", default="auto", help="ASR device (default: auto)")
     summarize.add_argument("--compute-type", default="int8", help="ASR compute type (default: int8)")
+    summarize.add_argument(
+        "--platform-profile",
+        choices=["auto", "nvidia", "apple_silicon", "intel", "amd", "cpu"],
+        default="auto",
+        help="ASR runtime profile hint (default: auto)",
+    )
     summarize.add_argument("--api-base", default="", help="OpenAI-compatible API base URL")
     summarize.add_argument("--api-key", default="", help="OpenAI-compatible API key")
     summarize.add_argument("--model", "--llm-model", dest="model", default="glm-4.6v", help="Model name")
@@ -108,6 +114,7 @@ def _run_summarize(args: argparse.Namespace) -> dict[str, Any]:
         "asr_model": args.asr_model,
         "device": args.device,
         "compute_type": args.compute_type,
+        "platform_profile": args.platform_profile,
         "chunk_sec": args.chunk_sec,
     }
 
