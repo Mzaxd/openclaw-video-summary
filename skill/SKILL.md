@@ -44,7 +44,7 @@ Optional enhanced artifacts:
 ## Minimal Run Command
 
 ```bash
-python3 -m openclaw_video_summary.interfaces.cli summarize "<input>" --mode auto --output-root ./runs --json-summary
+python3 -m openclaw_video_summary.interfaces.cli summarize "<input>" --mode auto --platform-profile auto --output-root ./runs --json-summary
 ```
 
 Use `--api-base` and `--api-key` flags or environment variables when provider credentials are required.
@@ -56,3 +56,6 @@ Recommended env vars:
 
 - Do not infer success from chat text only. Check artifact files.
 - If provider is unavailable, fallback summary may appear; surface this clearly.
+- ASR runtime can be controlled with `--platform-profile`.
+- On Apple Silicon, `apple_silicon` profile prefers `mlx-whisper`; if unavailable/fails, it auto-falls back to `faster-whisper(cpu)`.
+- Check `summarize_manifest.json -> transcribe.engine` and `transcribe.runtime_profile` to report which ASR path actually ran.

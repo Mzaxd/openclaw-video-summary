@@ -48,6 +48,7 @@ python3 -m openclaw_video_summary.interfaces.cli summarize \
 
 - 默认 `--platform-profile auto`：根据平台自动推断较优 `device/compute_type`
 - 可手动指定：`--platform-profile apple_silicon|nvidia|intel|amd|cpu`
+- Apple Silicon 默认优先 `mlx-whisper`（Metal）；若未安装或运行失败会自动回退到 `faster-whisper(cpu)`
 - 显式传 `--device` 或 `--compute-type` 时，会覆盖 profile 自动选择
 
 ## 为什么好用

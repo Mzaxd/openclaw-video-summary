@@ -108,10 +108,17 @@ python3 -m pip install -e .
 python3 -m pip install -e 'tools/bili-analyzer[asr]'
 ```
 
+如果是 macOS Apple Silicon，建议额外安装（启用 Metal ASR 加速）：
+
+```bash
+python3 -m pip install mlx-whisper
+```
+
 说明：
 
 - `-e .` 安装 `openclaw-video-summary` CLI 入口
 - `tools/bili-analyzer[asr]` 安装 ASR 后端（含 `faster-whisper`）
+- Apple Silicon 会优先尝试 `mlx-whisper`，失败时自动回退 `faster-whisper(cpu)`
 
 ## 6. OpenClaw Skill 安装
 
@@ -181,6 +188,7 @@ yt-dlp --version
 ffmpeg -version
 python3 -c "import openclaw_video_summary; print('openclaw_video_summary ok')"
 python3 -c "import bili_analyzer; print('bili_analyzer ok')"
+python3 -c "import mlx_whisper; print('mlx_whisper ok')" || true
 ```
 
 ### 8.2 最小执行验证
@@ -236,6 +244,18 @@ python3 -m pip install -e 'tools/bili-analyzer[asr]'
 ```
 
 重试最小验证命令。
+
+### 9.6 Apple Silicon 未走硬件加速
+
+症状：manifest 中 `transcribe.engine` 不是 `mlx-whisper`。
+
+修复：
+
+```bash
+python3 -m pip install -U mlx-whisper
+```
+
+说明：若 `mlx-whisper` 不可用，系统会自动回退到 `faster-whisper(cpu)`，功能可用但速度较慢。
 
 ### 9.4 输出里出现 `summary_source: local_fallback`
 

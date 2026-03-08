@@ -132,6 +132,11 @@ python3 -m openclaw_video_summary.interfaces.cli summarize \
 - 如果显式传了 `--device` 或 `--compute-type`，优先使用显式参数
 - 否则按 `--platform-profile` 进行自动/手动平台选择
 
+Apple Silicon 行为 | Apple Silicon behavior:
+- `--platform-profile apple_silicon` 会优先使用 `mlx-whisper`（Metal）
+- 若 `mlx-whisper` 未安装或执行失败，会自动回退到 `faster-whisper(cpu)`
+- manifest 可通过 `transcribe.engine` 与 `transcribe.runtime_profile` 查看最终落地路径
+
 ## 5. `auto` 如何判断 | How `auto` Decides
 
 中文：
@@ -299,6 +304,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.e2e.test_bilibili_url -v
 
 中文：
 - 本地 CPU 跑 ASR 会慢，这是预期行为
+- macOS Apple Silicon 建议安装 `mlx-whisper` 以启用 Metal 加速：
+  `python3 -m pip install mlx-whisper`
 - `fusion` 比 `fast` 慢很多，因为要做分段视频多模态分析
 - 如果 provider 抖动，`fusion` 会比 `fast` 更容易受到影响
 - 如果只想快速拿到稳定总结，优先 `auto` 或 `fast`

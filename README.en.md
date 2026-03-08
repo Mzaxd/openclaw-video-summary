@@ -37,11 +37,19 @@ export OCVS_API_KEY="your-api-key"
 python3 -m openclaw_video_summary.interfaces.cli summarize \
   "https://www.bilibili.com/video/BV..." \
   --mode auto \
+  --platform-profile auto \
   --output-root ./runs \
   --api-base "$OCVS_API_BASE" \
   --api-key "$OCVS_API_KEY" \
   --json-summary
 ```
+
+## Platform ASR Acceleration
+
+- Default `--platform-profile auto` picks a runtime profile by platform
+- Manual profile override: `--platform-profile apple_silicon|nvidia|intel|amd|cpu`
+- On Apple Silicon, it prefers `mlx-whisper` (Metal) and automatically falls back to `faster-whisper(cpu)` if `mlx-whisper` is unavailable or fails
+- Explicit `--device` / `--compute-type` overrides profile selection
 
 ## Why It Feels Easy
 
