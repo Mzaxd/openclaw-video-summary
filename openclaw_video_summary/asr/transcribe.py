@@ -42,6 +42,75 @@ def write_transcript(payload: TranscriptPayload, output_path: Path | str) -> Pat
     return path
 
 
+def _mlx_model_name(asr_model: str) -> str:
+    override = (os.environ.get("OCVS_MLX_MODEL") or "").strip()
+    if override:
+        return override
+    name = (asr_model or "small").strip().lower()
+    aliases = {
+        "tiny": "whisper-tiny",
+        "base": "whisper-base",
+        "small": "whisper-small",
+        "medium": "whisper-medium",
+        "large": "whisper-large-v3",
+        "large-v2": "whisper-large-v2",
+        "large-v3": "whisper-large-v3",
+    }
+    return f"mlx-community/{aliases.get(name, name)}"
+
+
+def _transcribe_with_mlx_backend(
+    *,
+    input_path: str | Path,
+    output_dir: str | Path,
+    asr_model: str,
+    language: str,
+    runtime: dict[str, str],
+) -> tuple[TranscriptPayload, dict[str, Any]]:
+    try:
+        from mlx_whisper import transcribe as mlx_transcribe
+    except Exception as exc:
+        raise RuntimeError("mlx-whisper is not installed") from exc
+
+    model_name = _mlx_model_name(asr_model)
+    call_kwargs: dict[str, Any] = {"path_or_hf_repo": model_name}
+    if language != "auto":
+        call_kwargs["language"] = language
+
+    try:
+        raw = mlx_transcribe(str(input_path), **call_kwargs)
+    except TypeError:
+        call_kwargs.pop("path_or_hf_repo", None)
+        call_kwargs["model"] = model_name
+        raw = mlx_transcribe(str(input_path), **call_kwargs)
+
+    segments_raw = list(raw.get("segments") or [])
+    segments: list[dict[str, Any]] = []
+    for segment in segments_raw:
+        segments.append(
+            {
+                "start": round(float(segment.get("start") or 0.0), 3),
+                "end": round(float(segment.get("end") or 0.0), 3),
+                "text": str(segment.get("text") or "").strip(),
+            }
+        )
+    text = str(raw.get("text") or "").strip()
+    payload = TranscriptPayload(text=text, segments=segments)
+    transcript_path = write_transcript(payload, Path(output_dir) / "transcript.json")
+    result = {
+        "input_video": str(input_path),
+        "output_dir": str(output_dir),
+        "transcript_file": str(transcript_path),
+        "engine": "mlx-whisper",
+        "model": model_name,
+        "language": str(raw.get("language") or language),
+        "segment_count": len(segments),
+        "text_chars": len(text),
+        "runtime_profile": runtime,
+    }
+    return payload, result
+
+
 def resolve_transcribe_runtime(
     *,
     platform_name: str,
@@ -88,6 +157,23 @@ def transcribe_with_backend(
         compute_type=compute_type,
         env=dict(os.environ),
     )
+
+    if runtime["profile"] == "apple_silicon" and runtime["device"] == "mps":
+        try:
+            return _transcribe_with_mlx_backend(
+                input_path=input_path,
+                output_dir=output_dir,
+                asr_model=asr_model,
+                language=language,
+                runtime=runtime,
+            )
+        except Exception as exc:
+            runtime = {
+                "profile": "apple_silicon_cpu_fallback",
+                "device": "cpu",
+                "compute_type": "int8",
+                "reason": f"mlx fallback: {exc}",
+            }
     backend_language = None if language == "auto" else language
     result = transcribe_video(
         input_path=str(input_path),
