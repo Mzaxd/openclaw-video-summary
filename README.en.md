@@ -2,48 +2,36 @@
 
 Default README is Chinese. Click here for Chinese: [README.md](README.md)
 
-A video summarization tool for OpenClaw. It accepts YouTube / Bilibili URLs or local video files, materializes them locally first, runs an ASR-first summary pipeline, and upgrades to `fusion` only when visual evidence is likely useful.
+Paste a video link into OpenClaw and get an auto-downloaded, auto-transcribed, Chinese summary with traceable artifacts.
 
-## Overview
+## Fastest OpenClaw Setup (Recommended)
 
-- Default mode is `auto`
-- Main flow is `download/localize -> ASR -> timeline -> Chinese summary`
-- Mostly verbal videos usually stay in `fast`
-- Tutorials, demos, UI walkthroughs, and chart-heavy videos are more likely to upgrade to `fusion`
-- Outputs are stable, traceable, and reproducible
+Use this guide directly:
+- [docs/openclaw-install-for-ai.md](docs/openclaw-install-for-ai.md)
 
-## Core Capabilities
+It already includes:
+- macOS / Linux / Windows (WSL2) auto-branch installation
+- OpenClaw + system deps + Python deps setup
+- Skill installation (workspace / global / ClawHub)
+- One-pass verification and common fixes
 
-- Inputs: YouTube URL, Bilibili URL, local video file
-- Modes: `auto`, `fast`, `fusion`, `quality`
-- Supports persistent summary-template overrides
-- Works with OpenAI-compatible APIs
-- Produces summary, timeline, transcript, manifest, and `fusion` evidence artifacts
+## 3-Step Quick Start
 
-## Installation
-
-### System Dependencies
-
-```bash
-python3 --version
-yt-dlp --version
-ffmpeg -version
-```
-
-Required:
-- `python >= 3.10`
-- `yt-dlp`
-- `ffmpeg`
-
-### Project Install
+### 1) Install dependencies
 
 ```bash
 python3 -m pip install -e .
+python3 -m pip install -e 'tools/bili-analyzer[asr]'
 ```
 
-## Quick Start
+### 2) Configure provider
 
-### CLI
+```bash
+export OCVS_API_BASE="https://your-openai-compatible-endpoint"
+export OCVS_API_KEY="your-api-key"
+```
+
+### 3) Run
 
 ```bash
 python3 -m openclaw_video_summary.interfaces.cli summarize \
@@ -52,157 +40,56 @@ python3 -m openclaw_video_summary.interfaces.cli summarize \
   --output-root ./runs \
   --api-base "$OCVS_API_BASE" \
   --api-key "$OCVS_API_KEY" \
-  --model glm-4.6v \
   --json-summary
 ```
 
-`--mode auto` is the recommended default.
+## Why It Feels Easy
 
-### OpenClaw Usage
+- Simple: paste a link, `auto` picks the right mode
+- Reliable: local artifacts are always saved and traceable
+- Practical: fallback still gives usable output when upstream fails
 
-1. Paste a YouTube / Bilibili link
-2. The tool downloads the video locally first
-3. It runs `auto` by default
-4. It returns a Chinese summary, timeline excerpts, key evidence, and artifact paths
+## Template Customization (Key Feature)
 
-## Modes
+Customize summary style long-term without changing Python code.
 
-### `auto`
+Priority order:
+1. `OCVS_SUMMARY_TEMPLATE_FILE=/absolute/path/to/summary_prompt.md`
+2. repo-local `summary_prompt.local.md`
+3. global `~/.config/openclaw-video-summary/summary_prompt.md`
+4. built-in default template
 
-- Runs `fast` once first
-- Uses transcript and timeline to decide whether visual evidence matters
-- Keeps `fast` for talking-head / low-visual-value videos
-- Upgrades to `fusion` for tutorials, demos, operational walkthroughs, and chart-driven content
-
-Manifest fields:
-- `selected_mode`
-- `auto_selection.reason`
-- `auto_selection.signals`
-
-### `fast`
-
-- ASR-first path
-- Produces transcript, timeline, and Chinese summary
-- Faster and cheaper
-- Good for talking-head, commentary, interview, and podcast-like videos
-
-### `fusion`
-
-- Adds visual evidence on top of `fast`
-- Current implementation uses chunked video analysis
-- Best for tutorials, demos, UI workflows, and chart-heavy videos
-- Downgrades to `fast` when the visual path fails
-
-### `quality`
-
-Reserved as a quality-first layer above `fusion`.
-
-## Provider Configuration
-
-Both summary generation and multimodal analysis currently use an OpenAI-compatible interface.
-
-Environment variables:
+Quick start:
 
 ```bash
-export OCVS_API_BASE="https://your-openai-compatible-endpoint"
-export OCVS_API_KEY="your-api-key"
+cp summary_prompt.local.md.example summary_prompt.local.md
 ```
-
-Or pass them through CLI flags:
-- `--api-base`
-- `--api-key`
-- `--model`
-
-## Custom Summary Template
-
-Persistent summary-template customization is supported without changing Python code.
-
-Override priority:
-1. `OCVS_SUMMARY_TEMPLATE_FILE=/absolute/path/to/summary_prompt.md`
-2. Repo-local `summary_prompt.local.md`
-3. Global `~/.config/openclaw-video-summary/summary_prompt.md`
-4. Built-in default template
 
 Template placeholders:
 - `{{visual_context}}`
 - `{{timeline_brief}}`
 - `{{transcript_text}}`
 
-Repo-local quick start:
-
-```bash
-cp summary_prompt.local.md.example summary_prompt.local.md
-```
-
-Global template:
-
-```bash
-mkdir -p ~/.config/openclaw-video-summary
-cp summary_prompt.local.md.example ~/.config/openclaw-video-summary/summary_prompt.md
-```
-
-Reference files:
+References:
 - [summary_prompt.local.md.example](summary_prompt.local.md.example)
 - [summary_prompt.default.md](openclaw_video_summary/summary/summary_prompt.default.md)
 
-## Artifact Contract
+## Output Artifacts
 
-Every run produces one task directory.
-
-Base artifacts:
-- `video.mp4`
+Each run creates a task folder with core files:
 - `summary_zh.md`
 - `timeline.json`
 - `transcript.json`
 - `summarize_manifest.json`
 
-Additional artifacts for enhanced modes:
-- `evidence.json`
-- `fusion_report.md`
+## Technical Details (Short)
 
-Chat responses should be treated as a summarized view of these saved artifacts.
+- Inputs: YouTube / Bilibili / local video
+- Modes: `auto` (default), `fast`, `fusion`, `quality`
+- Required: `python>=3.10`, `yt-dlp`, `ffmpeg`
+- API: OpenAI-compatible
 
-## Downgrade Behavior
-
-- `fusion -> fast`
-- `quality -> fusion`
-- `quality -> fast`
-
-Fallback metadata is written into the manifest.
-
-## Tests
-
-### Unit + Integration
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -v
-```
-
-### Optional E2E
-
-```bash
-export OCVS_E2E=1
-export OCVS_API_BASE="https://your-openai-compatible-endpoint"
-export OCVS_API_KEY="your-api-key"
-export OCVS_YOUTUBE_URL="https://www.youtube.com/watch?v=..."
-export OCVS_BILIBILI_URL="https://www.bilibili.com/video/BV..."
-```
-
-Run:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.e2e.test_youtube_url -v
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.e2e.test_bilibili_url -v
-```
-
-## Current Limitations
-
-- Local ASR can be slow on CPU-only environments
-- Chunked multimodal requests in `fusion` can be latency-heavy
-- Remote provider stability directly affects `fusion`
-- This branch is suitable for ongoing iteration, not yet for strong production-ready claims
-
-## More Detail
-
+More details:
 - Usage guide: [docs/usage.md](docs/usage.md)
 - Skill contract: [skill/SKILL.md](skill/SKILL.md)
+- Install guide for OpenClaw: [docs/openclaw-install-for-ai.md](docs/openclaw-install-for-ai.md)
